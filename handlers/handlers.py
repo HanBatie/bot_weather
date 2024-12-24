@@ -8,6 +8,7 @@ from aiogram.fsm.context import FSMContext
 
 import keyboards.kb as kb
 import keyboards.inl as inl
+from services.weather_service import get_weather_forecast
 
 router = Router()
 
@@ -83,7 +84,16 @@ async def process_time_interval(message: types.Message, state: FSMContext):
                          f"Временной интервал: {data['time_interval']}\n"
                          f"Проверьте введённую информацию",
                          reply_markup=inl.check_data)
-    await state.set_state(WeatherForecast.days_interval)
+
+async def check_data(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    await message.answer(f"Проверьте правильность введенных данных:\n"
+                         f"Пункт отправления: {data['start_point']}\n"
+                         f"Пункт назначения: {data['end_point']}\n"
+                         f"Промежуточные пункты: {data.get('other_points', '')}\n"
+                         f"Временной интервал: {data['time_interval']}\n"
+                         f"Проверьте введённую информацию",
+                         reply_markup=inl.check_data)
 
 #Получение промежуточных точек
 @router.callback_query(F.data == 'other_points')
@@ -94,10 +104,30 @@ async def other_points(callback: types.CallbackQuery, state: FSMContext):
 @router.message(WeatherForecast.other_points)
 async def process_other_points(message: types.Message, state: FSMContext):
     await state.update_data(other_points=message.text)
-    await message.answer(await process_time_interval(message, state))
+    await message.answer(await check_data(message, state))
 
 #Получение прогноза
 @router.callback_query(F.data == 'correct_data')
 async def correct_data(callback: types.CallbackQuery, state: FSMContext):
-    await callback.message.answer("Прогноз погоды будет отправлен в ближайшее время")
+    await callback.message.answer("Получение прогноза погоды...")
+    data = await state.get_data()
+    logging.debug(f"Данные пользователя: {data}")
+    logging.info(f"Получен запрос на получение прогноза погоды. id: {data['user_id']}")
+
+    start_city = data.get('start_point')
+    end_city = data.get('end_point')
+    intermediate_cities = data.get('other_points', '')
+    days_text = data.get('time_interval').strip()
+    days = int(days_text.split()[0])
+
+    # Получение прогноза погоды
+    forecast_message = await get_weather_forecast(
+        start_city=start_city,
+        end_city=end_city,
+        intermediate_cities=intermediate_cities,
+        days=days
+    )
+
+    await callback.message.answer(forecast_message, parse_mode='Markdown')
+    await state.finish()
 
