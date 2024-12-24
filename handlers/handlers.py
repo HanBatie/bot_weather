@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import subprocess  # Добавлено для запуска app.py
 
 from aiogram import types, F, Router
 from aiogram.filters import Command, CommandStart
@@ -109,6 +110,7 @@ async def process_other_points(message: types.Message, state: FSMContext):
 #Получение прогноза
 @router.callback_query(F.data == 'correct_data')
 async def correct_data(callback: types.CallbackQuery, state: FSMContext):
+
     await callback.message.answer("Получение прогноза погоды...")
     data = await state.get_data()
     logging.debug(f"Данные пользователя: {data}")
@@ -120,6 +122,16 @@ async def correct_data(callback: types.CallbackQuery, state: FSMContext):
     days_text = data.get('time_interval').strip()
     days = int(days_text.split()[0])
 
+    # Формируем URL для графиков
+    graph_url = f"http://127.0.0.1:5000/?start={start_city}&end={end_city}&days={days}"
+    if intermediate_cities:
+        graph_url += f"&via={intermediate_cities}"
+
+    # Создаем инлайн-кнопку для графиков
+    graphs_keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
+        [types.InlineKeyboardButton(text="📊 Интерактивные графики", url=graph_url)]
+    ])
+
     # Получение прогноза погоды
     forecast_message = await get_weather_forecast(
         start_city=start_city,
@@ -128,6 +140,13 @@ async def correct_data(callback: types.CallbackQuery, state: FSMContext):
         days=days
     )
 
-    await callback.message.answer(forecast_message, parse_mode='Markdown')
-    await state.finish()
+    try:
+        subprocess.Popen(['python', 'services/web_weather/app.py'])  # Замените путь на актуальный
+        logging.info("Dash-приложение запущено.")
+    except Exception as e:
+        logging.error(f"Ошибка при запуске Dash-приложения: {e}")
+        await callback.message.answer(forecast_message, "Не удалось построить графики", reply_markup=None)
+        return
+    
+    await callback.message.answer(forecast_message, parse_mode='Markdown', reply_markup=graphs_keyboard)
 

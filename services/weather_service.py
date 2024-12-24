@@ -42,8 +42,8 @@ async def get_weather_forecast(start_city: str, end_city: str, intermediate_citi
             wind_speed = day['wind_speed']
             humidity = day['humidity']
             precipitation_prob = day['precipitation_prob']
-            forecast_message += (f"• {date}:\n      Температура: Мин {temp_min}°C, Макс {temp_max}°C \n     Ветер {wind_speed} км/ч \n "
-                                 f"     Влажность {humidity}% \n    Возможность дождя {precipitation_prob}%\n")
+            forecast_message += (f"• {date}:\n     Температура: Мин {temp_min}°C, Макс {temp_max}°C \n     Ветер {wind_speed} км/ч \n "
+                                 f"    Влажность {humidity}% \n    Возможность дождя {precipitation_prob}%\n")
         forecast_message += "\n"
     
     return forecast_message
